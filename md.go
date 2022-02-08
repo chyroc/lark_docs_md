@@ -2,249 +2,318 @@ package lark_docs_md
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/chyroc/lark"
 )
 
-func Unmarshal(content string) (*Docs, error) {
-	res := new(Docs)
-	err := json.Unmarshal([]byte(content), res)
-	return res, err
+type FormatOpt struct {
+	ctx         context.Context
+	LarkClient  *lark.Lark // lark 客户端
+	StaticDir   string     // 如果需要下载静态文件，那么需要指定静态文件的目录
+	FilePrefix  string     // 针对静态文件，需要指定文件在 Markdown 中的前缀
+	StaticAsURL bool       // 不下载静态文件，直接把静态文件的 URL 插入到 Markdown 中
 }
 
-func (r *Docs) Markdown(cli *lark.Lark, dir, staticPrefix string) string {
-	opt := &formatOpt{cli: cli, dir: dir, staticPrefix: staticPrefix}
-	parchOpt(r, opt)
+func DocMarkdown(ctx context.Context, doc *lark.DocContent, opt *FormatOpt) string {
+	if opt == nil {
+		opt = new(FormatOpt)
+	}
+	opt.ctx = ctx
+	if opt.StaticDir == "" {
+		opt.StaticDir = "static"
+	}
+	if opt.FilePrefix == "" {
+		opt.FilePrefix = "static"
+	}
 
-	buf := strings.Builder{}
-	buf.WriteString(r.Title.Markdown())
-	buf.WriteString("\n")
-	buf.WriteString(r.Body.Markdown(false))
+	buf := new(strings.Builder)
+
+	buf.WriteString("# ")
+	buf.WriteString(DocParagraphMarkdown(doc.Title, opt))
+	buf.WriteString("\n\n")
+
+	buf.WriteString(DocBodyMarkdown(doc.Body, opt))
+
 	return buf.String()
 }
 
-func (r *Style) Markdown() string {
-	if r == nil {
-		return ""
-	}
-	s := ""
-	if r.Quote {
-		s = ">" + s
-	}
-	for i := r.HeadingLevel; i >= 1; i-- {
-		s = "#" + s
-	}
-	// r.List.Type
+func DocBodyMarkdown(r *lark.DocBody, opt *FormatOpt) string {
+	buf := new(strings.Builder)
 
-	if r.List != nil && r.List.Type != "" {
-		switch r.List.Type {
-		case "checkBox":
-			s = "- [ ]" + s
-		case "checkedBox":
-			s = "- [x]" + s
-		case "number":
-			s = r.List.ListTag() + s
-		case "bullet":
-			s = r.List.ListTag() + s
-		default:
-			panic(fmt.Sprintf("style list: %s", r.List.Type))
-		}
+	for _, v := range r.Blocks {
+		buf.WriteString(DocBlockMarkdown(v, opt))
+		buf.WriteString("\n")
 	}
-	if r.List != nil {
-		for i := r.List.IndentLevel; i >= 2; i-- {
-			s = "   " + s
-		}
-	}
-	if s == "" {
-		return s
-	}
-	return s + ""
+
+	return buf.String()
 }
 
-func (r *TextRun) Markdown() string {
-	if r.Style.Link.URL != "" {
-		x, _ := url.QueryUnescape(r.Style.Link.URL)
-		return fmt.Sprintf("[%s](%s)", r.Text, x)
-	}
-	s := r.Style.Markdown()
-	if s == "" {
-		return r.Text
-	}
-	return s + " " + r.Text
-}
-
-func (r *Element) Markdown() string {
+func DocBlockMarkdown(r *lark.DocBlock, opt *FormatOpt) string {
 	switch r.Type {
-	case "textRun":
-		return r.TextRun.Markdown()
-	case "docsLink":
-		return r.DocsLink.Markdown()
+	case "paragraph":
+		return DocParagraphMarkdown(r.Paragraph, opt)
+	case "gallery":
+		return DocGalleryMarkdown(r.Gallery, opt)
+	case "file":
+		return DocFileMarkdown(r.File, opt)
+	case "chatGroup":
+		return DocChatGroupMarkdown(r.ChatGroup, opt)
+	case "table":
+		return DocTableMarkdown(r.Table, opt)
+	case "horizontalLine":
+		return DocHorizontalLineMarkdown(r.HorizontalLine, opt)
+	case "embeddedPage":
+		return DocEmbeddedPageMarkdown(r.EmbeddedPage, opt)
+	case "sheet":
+		return DocSheetMarkdown(r.Sheet, opt)
+	case "bitable":
+		return DocBitableMarkdown(r.Bitable, opt)
+	case "diagram":
+		return DocDiagramMarkdown(r.Diagram, opt)
+	case "jira":
+		return DocJiraMarkdown(r.Jira, opt)
+	case "poll":
+		return DocPollMarkdown(r.Poll, opt)
+	case "code":
+		return DocCodeMarkdown(r.Code, opt)
+	case "docsApp":
+		return DocDocsAppMarkdown(r.DocsApp, opt)
+	case "callout":
+		return DocCalloutMarkdown(r.Callout, opt)
+	case "undefinedBlock":
+		return DocUndefinedBlockMarkdown(r.UndefinedBlock, opt)
 	default:
-		panic(fmt.Sprintf("Element type %s", r.Type))
+		return fmt.Sprintf("<!-- unknown block type %s -->", r.Type)
 	}
 }
 
-func (r *Elements) Markdown() string {
-	buf := strings.Builder{}
+func DocParagraphMarkdown(r *lark.DocParagraph, opt *FormatOpt) string {
+	buf := new(strings.Builder)
 
-	for idx, v := range *r {
-		if idx > 0 {
-			buf.WriteString("\n")
-		}
-		buf.WriteString(v.Markdown())
-	}
-	return buf.String()
-}
-
-func (r *Title) Markdown() string {
-	return r.Elements.Markdown()
-}
-
-func (r *Paragraph) Markdown(block bool) string {
-	p := r.Elements.Markdown()
-	s := r.Style.Markdown()
-	if s == "" {
-		if !block {
-			return p + "\n"
-		}
-		return p
-	}
-	return s + " " + p
-}
-
-func (r *Callout) Markdown() string {
-	return "```\n" + r.Body.Markdown(true) + "\n```"
-}
-
-func (r *Code) Markdown() string {
-	buf := strings.Builder{}
-	buf.WriteString("```")
-	buf.WriteString(r.Language)
-	buf.WriteString("\n")
-	buf.WriteString(r.Body.Markdown(true))
-	buf.WriteString("\n```")
-	return buf.String()
-}
-
-func (r *Image) Markdown() string {
-	path := saveMedia(r.opt, r.FileToken, ".png")
-	return fmt.Sprintf("<img src=\"%s\" width=%d height=%d>", path, r.Width, r.Height)
-}
-
-func (r *Images) Markdown() string {
-	buf := strings.Builder{}
-
-	for idx, v := range *r {
-		if idx > 0 {
+	if r.Style != nil {
+		if r.Style.HeadingLevel > 0 {
+			buf.WriteString(strings.Repeat("#", r.Style.HeadingLevel))
 			buf.WriteString(" ")
 		}
-		buf.WriteString(v.Markdown())
+		if r.Style.List != nil {
+			buf.WriteString(r.Style.List.ListTag())
+			buf.WriteString(" ")
+		}
+		switch {
+		case r.Style.Quote:
+			buf.WriteString("> ")
+		}
 	}
+
+	for _, v := range r.Elements {
+		buf.WriteString(DocParagraphElementMarkdown(v, opt))
+	}
+
+	if r.Style != nil {
+		if r.Style.HeadingLevel > 0 {
+			buf.WriteString("\n")
+		}
+	}
+
 	return buf.String()
 }
 
-func (r *Gallery) Markdown() string {
-	return r.ImageList.Markdown()
+func DocGalleryMarkdown(r *lark.DocGallery, opt *FormatOpt) string {
+	buf := new(strings.Builder)
+
+	for _, v := range r.ImageList {
+		buf.WriteString(DocImageItemMarkdown(v, opt))
+	}
+
+	return buf.String()
 }
 
-func (r *Table) Markdown() string {
-	return "table"
+func DocImageItemMarkdown(r *lark.DocImageItem, opt *FormatOpt) string {
+	if opt.LarkClient == nil {
+		return fmt.Sprintf("`[image: %s]`", r.FileToken)
+	}
+
+	target := downloadFile(opt.ctx, r.FileToken, r.FileToken+".jpg", opt)
+	return fmt.Sprintf("<img src=%q width=\"%d\" height=\"%d\"/>", target, r.Width, r.Height)
 }
 
-func (r *Block) Markdown(block bool) string {
+func DocChatGroupMarkdown(r *lark.DocChatGroup, opt *FormatOpt) string {
+	return fmt.Sprintf("`[chat: %s]`", r.OpenChatID)
+}
+
+func DocTableMarkdown(r *lark.DocTable, opt *FormatOpt) string {
+	// todo
+	buf := new(strings.Builder)
+
+	return buf.String()
+}
+
+func DocHorizontalLineMarkdown(r *lark.DocHorizontalLine, opt *FormatOpt) string {
+	return "\n---\n"
+}
+
+func DocEmbeddedPageMarkdown(r *lark.DocEmbeddedPage, opt *FormatOpt) string {
+	return fmt.Sprintf("[embedded-page: %s](%s)", r.Type, r.Url)
+}
+
+func DocSheetMarkdown(r *lark.DocSheet, opt *FormatOpt) string {
+	return fmt.Sprintf("`[sheet: %s]`", r.Token)
+}
+
+func DocBitableMarkdown(r *lark.DocBitable, opt *FormatOpt) string {
+	return fmt.Sprintf("`[bitable: %s / %s]`", r.ViewType, r.Token)
+}
+
+func DocDiagramMarkdown(r *lark.DocDiagram, opt *FormatOpt) string {
+	return fmt.Sprintf("`[diagram: %s / %s]`", r.DiagramType, r.Token)
+}
+
+func DocPollMarkdown(r *lark.DocPoll, opt *FormatOpt) string {
+	return fmt.Sprintf("`[poll: %s]`", r.Token)
+}
+
+func DocCodeMarkdown(r *lark.DocCode, opt *FormatOpt) string {
+	buf := new(strings.Builder)
+
+	buf.WriteString("```")
+	if r.Language != "" {
+		buf.WriteString(r.Language)
+	}
+	buf.WriteString("\n")
+
+	buf.WriteString(DocBodyMarkdown(r.Body, opt))
+
+	buf.WriteString("\n")
+	buf.WriteString("```")
+
+	return buf.String()
+}
+
+func DocDocsAppMarkdown(r *lark.DocDocsApp, opt *FormatOpt) string {
+	return fmt.Sprintf("`[docs-app: %s]`", r.TypeID)
+}
+
+func DocCalloutMarkdown(r *lark.DocCallout, opt *FormatOpt) string {
+	buf := new(strings.Builder)
+
+	buf.WriteString("```")
+	buf.WriteString("\n")
+
+	buf.WriteString(DocBodyMarkdown(r.Body, opt))
+
+	buf.WriteString("\n")
+	buf.WriteString("```")
+
+	return buf.String()
+}
+
+func DocUndefinedBlockMarkdown(r *lark.DocUndefinedBlock, opt *FormatOpt) string {
+	return "`[undefined-block]`"
+}
+
+func DocParagraphElementMarkdown(r *lark.DocParagraphElement, opt *FormatOpt) string {
 	switch r.Type {
-	case "callout":
-		return r.Callout.Markdown()
-	case "horizontalLine":
-		return "\n---"
-	case "code":
-		return r.Code.Markdown()
-	case "gallery":
-		return r.Gallery.Markdown()
-	case "table":
-		return r.Table.Markdown()
-	case "paragraph":
-		return r.Paragraph.Markdown(block)
-	case "sheet":
-		return r.Sheet.Markdown()
-	case "undefinedBlock":
-		return fmt.Sprintf("不支持的飞书文档组件: 未知组件")
-	case "chatGroup":
-		return r.ChatGroup.Markdown()
+	case "textRun":
+		return DocTextRunMarkdown(r.TextRun, opt)
+	case "docsLink":
+		return DocDocsLinkMarkdown(r.DocsLink, opt)
+	case "person":
+		return DocPersonMarkdown(r.Person, opt)
+	case "equation":
+		return DocEquationMarkdown(r.Equation, opt)
+	case "reminder":
+		return DocReminderMarkdown(r.Reminder, opt)
 	case "file":
-		return r.File.Markdown()
+		return DocFileMarkdown(r.File, opt)
+	case "jira":
+		return DocJiraMarkdown(r.Jira, opt)
+	case "undefinedElement":
+		return DocUndefinedElementMarkdown(r.UndefinedElement, opt)
 	default:
-		panic(fmt.Sprintf("block: %s", r.Type))
+		return fmt.Sprintf("<!-- unknown doc paragrapg element type %s -->", r.Type)
 	}
 }
 
-func (r *Sheet) Markdown() string {
-	return "sheet"
-}
-
-func (r *DocsLink) Markdown() string {
-	return r.URL
-}
-
-func (r *ChatGroup) Markdown() string {
-	return fmt.Sprintf("不支持的飞书文档组件: 群名片")
-}
-
-func (r *File) Markdown() string {
-	path := saveMedia(r.opt, r.FileToken, filepath.Ext(r.FileName))
-	return fmt.Sprintf("[%s](%s)", r.FileName, path)
-}
-
-func (r *Blocks) Markdown(block bool) string {
-	buf := strings.Builder{}
-	for idx, v := range *r {
-		if idx > 0 {
-			buf.WriteString("\n")
-			if v.Paragraph != nil && v.Paragraph.Style != nil {
-				if v.Paragraph.Style.Quote && (*r)[idx-1].Paragraph.Style.Quote {
-					buf.WriteString(">\n")
-				}
-			}
-
+func DocTextRunMarkdown(r *lark.DocTextRun, opt *FormatOpt) string {
+	// **加粗**
+	// _斜体_
+	// ~~删除线~~
+	// <u>下划线</u>
+	// `行内代码`
+	// [title](url)
+	buf := new(strings.Builder)
+	if r.Style != nil {
+		switch {
+		case r.Style.Bold:
+			buf.WriteString("**")
+		case r.Style.Italic:
+			buf.WriteString("_")
+		case r.Style.StrikeThrough:
+			buf.WriteString("~~")
+		case r.Style.Underline:
+			buf.WriteString("<u>")
+		case r.Style.CodeInline:
+			buf.WriteString("`")
+		case r.Style.Link != nil && r.Style.Link.URL != "":
+			buf.WriteString("[")
 		}
-		if v.Paragraph != nil && v.Paragraph.Style != nil && v.Paragraph.Style.HeadingLevel >= 1 && !strings.HasSuffix(buf.String(), "\n\n") {
-			buf.WriteString("\n")
-		}
-		buf.WriteString(v.Markdown(block))
 	}
+
+	buf.WriteString(r.Text)
+
+	if r.Style != nil {
+		switch {
+		case r.Style.Bold:
+			buf.WriteString("**")
+		case r.Style.Italic:
+			buf.WriteString("_")
+		case r.Style.StrikeThrough:
+			buf.WriteString("~~")
+		case r.Style.Underline:
+			buf.WriteString("</u>")
+		case r.Style.CodeInline:
+			buf.WriteString("`")
+		case r.Style.Link != nil && r.Style.Link.URL != "":
+			buf.WriteString("](")
+			buf.WriteString(r.Style.Link.URL)
+			buf.WriteString(")")
+		}
+	}
+
 	return buf.String()
 }
 
-func (r *Body) Markdown(block bool) string {
-	return r.Blocks.Markdown(block)
+func DocDocsLinkMarkdown(r *lark.DocDocsLink, opt *FormatOpt) string {
+	return fmt.Sprintf("[%s](%s)", "云文档", r.URL)
 }
 
-func saveMedia(opt *formatOpt, fileToken string, ext string) string {
-	res, _, err := opt.cli.Drive.DownloadDriveMedia(context.Background(), &lark.DownloadDriveMediaReq{
-		FileToken: fileToken,
-	})
-	if err != nil {
-		panic(err)
-	}
-	err = os.MkdirAll(opt.dir, 0o777)
-	if err != nil {
-		panic(err)
+func DocPersonMarkdown(r *lark.DocPerson, opt *FormatOpt) string {
+	return "@" + r.OpenID
+}
+
+func DocEquationMarkdown(r *lark.DocEquation, opt *FormatOpt) string {
+	return fmt.Sprintf("$$%s$$", r.Equation)
+}
+
+func DocReminderMarkdown(r *lark.DocReminder, opt *FormatOpt) string {
+	return "`[doc-reminder]`"
+}
+
+func DocFileMarkdown(r *lark.DocFile, opt *FormatOpt) string {
+	if opt.LarkClient == nil {
+		return fmt.Sprintf("`[file: %s / %s]`", r.FileName, r.FileToken)
 	}
 
-	storePath := strings.TrimRight(opt.dir, "/") + "/" + fileToken + ext
-	mdPath := opt.staticPrefix + fileToken + ext
-	f, err := os.OpenFile(storePath, os.O_CREATE|os.O_WRONLY, 0o666)
-	if err != nil {
-		panic(err)
-	}
-	io.Copy(f, res.File)
+	target := downloadFile(opt.ctx, r.FileToken, r.FileName, opt)
+	return fmt.Sprintf("[file: %s](%s)", r.FileName, target)
+}
 
-	return mdPath
+func DocJiraMarkdown(r *lark.DocJira, opt *FormatOpt) string {
+	return fmt.Sprintf("`[jira: %s / %s]`", r.JiraType, r.Token)
+}
+
+func DocUndefinedElementMarkdown(r *lark.DocUndefinedElement, opt *FormatOpt) string {
+	return "`[undefined-element]`"
 }
