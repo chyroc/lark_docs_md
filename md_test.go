@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/chyroc/lark"
 	"github.com/chyroc/lark/larkext"
@@ -18,6 +19,7 @@ func TestDocMarkdown(t *testing.T) {
 	as := assert.New(t)
 	larkClient := lark.New(
 		lark.WithAppCredential(os.Getenv("LARK_CHYROC_HEYMAN_APP_ID"), os.Getenv("LARK_CHYROC_HEYMAN_APP_SECRET")),
+		lark.WithTimeout(time.Minute),
 	)
 
 	tests := []struct {
