@@ -28,6 +28,9 @@ jobs:
       run: |
         export IN_CI=1
         ./.github/test.sh
+      env:
+        LARK_CHYROC_HEYMAN_APP_ID: ${{ secrets.LARK_CHYROC_HEYMAN_APP_ID }}
+        LARK_CHYROC_HEYMAN_APP_SECRET: ${{ secrets.LARK_CHYROC_HEYMAN_APP_SECRET }}
 
     - name: Upload Cov
       run: bash <(curl -s https://codecov.io/bash)
