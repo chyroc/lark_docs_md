@@ -42,9 +42,14 @@ func DocMarkdown(ctx context.Context, doc *lark.DocContent, opt *FormatOpt) stri
 func DocBodyMarkdown(r *lark.DocBody, opt *FormatOpt) string {
 	buf := new(strings.Builder)
 
-	for _, v := range r.Blocks {
+	for idx, v := range r.Blocks {
 		buf.WriteString(DocBlockMarkdown(v, opt))
 		buf.WriteString("\n")
+
+		// 如果 v 是 list，并且是最后一个，那么需要换行
+		if idx == len(r.Blocks)-1 && v.Type == lark.DocBlockTypeParagraph && v.Paragraph.Style != nil && v.Paragraph.Style.List != nil && v.Paragraph.Style.List.IndentLevel > 0 {
+			buf.WriteString("\n")
+		}
 	}
 
 	return buf.String()
@@ -94,7 +99,7 @@ func DocParagraphMarkdown(r *lark.DocParagraph, opt *FormatOpt) string {
 
 	if r.Style != nil {
 		if r.Style.HeadingLevel > 0 {
-			buf.WriteString(strings.Repeat("#", r.Style.HeadingLevel))
+			buf.WriteString(strings.Repeat("#", int(r.Style.HeadingLevel)))
 			buf.WriteString(" ")
 		}
 		if r.Style.List != nil {
@@ -112,7 +117,9 @@ func DocParagraphMarkdown(r *lark.DocParagraph, opt *FormatOpt) string {
 	}
 
 	if r.Style != nil {
-		if r.Style.HeadingLevel > 0 {
+		if r.Style.List != nil && r.Style.List.IndentLevel > 0 {
+			//
+		} else {
 			buf.WriteString("\n")
 		}
 	}
