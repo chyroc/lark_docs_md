@@ -1,7 +1,7 @@
-github.com/chyroc/go-ptr v1.6.0 h1:4GwCNrNfk4806eQKbHO2A/N/YOLW6jHIrBPWKfMe6F0=
-github.com/chyroc/go-ptr v1.6.0/go.mod h1:FKNjNg3sCLx7VhQGwuml6sITX1mvhKS0Je9uN9tt65Q=
-github.com/chyroc/lark v0.0.97 h1:8ViQ4QKMo4Awo6iQBGqj41leCOWNKdq93HVyGshsVvs=
-github.com/chyroc/lark v0.0.97/go.mod h1:ZMmVyuBFmzLkiVKuORy7nEoNK/WvDh77cMsc3laJ5H8=
+github.com/chyroc/go-ptr v1.7.0 h1:wwm53+SeMvpQbBcsZviNPlz2djpxyELjVOZFHtUjHho=
+github.com/chyroc/go-ptr v1.7.0/go.mod h1:+AAlVrPed1XbNyqZ7r/J3o79V1awCvd5wrYkxu8tsow=
+github.com/chyroc/lark v0.0.101 h1:/cMqi17PCkHEB7aUF/pZmM4gT3KWPThv7nGiyAmrcIM=
+github.com/chyroc/lark v0.0.101/go.mod h1:iYv0NXuCzYeypk1eY9Mos6QP7CQuLK7YH3Oxi09p7NU=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -10,7 +10,6 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
-github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.1 h1:w7B6lhMri9wdJUVmEZPGGhZzrYTPvgJArz7wNPgYKsk=
