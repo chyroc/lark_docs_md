@@ -3,7 +3,7 @@ module github.com/chyroc/lark_docs_md
 go 1.17
 
 require (
-	github.com/chyroc/lark v0.0.102
+	github.com/chyroc/lark v0.0.104
 	github.com/stretchr/testify v1.8.1
 )
 
